@@ -14,7 +14,7 @@ class Renderer:
         self.WIDTH=WIDTH
         self.HEIGHT=HEIGHT
         self.ASP = WIDTH/HEIGHT
-        self.current_pix_density = 64
+        self.current_pix_density = 32
         self.FOV=FOV
         self.MARCH_STEPS = 1000 # Max march steps, the higher the more detail
         self.EPSILON = 0.1 # Tollerance of ray hit, the smaller, the more detail
@@ -23,15 +23,7 @@ class Renderer:
         self.lights = []
         self.scene_objects = []
 
-        self.USE_GPU = USE_GPU
-        self.x_pixels = np.array([], dtype=np.int32)
-        self.y_pixels = np.array([], dtype=np.int32)
-        # setup the pixel arrays for CUDA parrallelizations
-        if USE_GPU:
-            for i in range(0, self.WIDTH):
-                for j in range(0, self.HEIGHT):
-                    np.append(self.x_pixels, i)
-                    np.append(self.y_pixels, j)
+        self.pixels = [[None for x in range(HEIGHT)] for y in range(WIDTH)]
 
     def AddCamera(self, camera):
         self.camera = camera
@@ -55,9 +47,13 @@ class Renderer:
             if x % self.current_pix_density == 0:
                 for y in range(0, self.HEIGHT):
                     if y % self.current_pix_density == 0:
-                        self.CalculateRay(screen, x, y)
-        if self.current_pix_density  != 1:
-            self.current_pix_density/=2
+                        if self.pixels[x][y] == None:
+                            self.CalculateRay(screen, x, y)
+        self.current_pix_density-=1
+        for x in range(0, self.WIDTH):
+            for y in range(0, self.HEIGHT):
+                if self.pixels[x][y] != None:
+                    gfxdraw.pixel(screen, x, y, self.pixels[x][y])
         pygame.display.flip()
     
     def Run(self):
@@ -79,7 +75,7 @@ class Renderer:
         y_angle = MapVals(y, 0, self.HEIGHT, -self.FOV/2, self.FOV/2) # the y angle of this ray 
         direction = np.array([math.sin(x_angle), math.sin(y_angle), 1]) # turning these angles into a vector
         for i in range(0, self.MARCH_STEPS):
-            point = (self.camera.transform.pos + depth) * direction
+            point = (self.camera.transform.xyz + depth) * direction
             dist = self.SceneSDF(point)
             if dist < self.EPSILON:
                 # INSIDE SURFACE
@@ -90,7 +86,7 @@ class Renderer:
                 spec_rgb = [1,1,1]
                 sum_rgb = [0,0,0]
                 for light in self.lights:
-                    light_dir = Normalize(light.transform.pos - point)
+                    light_dir = Normalize(light.transform.xyz - point)
                     # Calculate diffuse intensity
                     diff_intensity = np.dot(light_dir, norm)
                     diff_rgb[0] *= (diff_intensity * light.colour[0])
@@ -111,7 +107,7 @@ class Renderer:
                 sum_rgb[0]=int(MapVals(sum_rgb[0], -1, 1, 0, 255))
                 sum_rgb[1]=int(MapVals(sum_rgb[1], -1, 1, 0, 255))
                 sum_rgb[2]=int(MapVals(sum_rgb[2], -1, 1, 0, 255))
-                gfxdraw.pixel(screen, x, y, (sum_rgb[0],sum_rgb[1],sum_rgb[2]))
+                self.pixels[x][y] = (sum_rgb[0],sum_rgb[1],sum_rgb[2])
                 break
             depth += dist
             steps += 1
@@ -120,7 +116,6 @@ class Renderer:
                 break
 
     def SceneSDF(self, pos):
-        #return sdf.sphere_sdf(np.array([0,0,5]), pos, 1)
         min_val = self.END
         for obj in self.scene_objects:
             val = obj.sdf(pos)
