@@ -3,6 +3,12 @@
 import numpy as np
 import math
 
+class SDF:
+    SMOOTH_MIN = 0
+    MIN = 1
+    SMOOTH_MAX = 2
+    MAX = 3
+
 def length(vec):
     return np.linalg.norm(vec)
 

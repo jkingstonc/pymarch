@@ -8,24 +8,29 @@ class Object:
         self.transform = Transform(x,y,z,rx,ry,rz)
 
 class Sphere(Object):
-    def __init__(self, rad=1, x=0, y=0, z=0, rx=0, ry=0, rz=0):
-        self.rad = rad
-        super().__init__(x, y, z, rx, ry, rz)
-
-    def sdf(self, pos):
-        return math.sqrt((pos[0] - self.transform.xyz[0])**2 + (pos[1] - self.transform.xyz[1])**2 + (pos[2] - self.transform.xyz[2])**2) - self.rad
-
-class SphereFractal(Object):
-    def __init__(self, c=1, rad=1, x=0, y=0, z=0, rx=0, ry=0, rz=0):
+    def __init__(self, fract=False, c=1, rad=1, x=0, y=0, z=0, rx=0, ry=0, rz=0):
+        self.fract = fract
         self.c = c
         self.rad = rad
         super().__init__(x, y, z, rx, ry, rz)
 
     def sdf(self, pos):
-        q = np.array([(pos[0] % self.c) - 0.5*self.c,
-                      (pos[1] % self.c) - 0.5*self.c,
-                      (pos[2] % self.c) - 0.5*self.c])
-        return math.sqrt((q[0] - self.transform.xyz[0])**2 + (q[1] - self.transform.xyz[1])**2 + (q[2] - self.transform.xyz[2])**2) - self.rad
+        if self.fract:
+            return self.sdf_fract(pos)
+        return math.sqrt((pos[0] - self.transform.xyz[0])**2 + (pos[1] - self.transform.xyz[1])**2 + (pos[2] - self.transform.xyz[2])**2) - self.rad
+
+    def sdf_fract(self, pos):
+        return math.sqrt(((pos[0] % self.c) - self.transform.xyz[0]) ** 2 + (
+                    (pos[1] % self.c) - self.c / 2 - self.transform.xyz[1]) ** 2 + (
+                                     pos[2] - self.transform.xyz[2]) ** 2) - self.rad
+class SphereWobble(Sphere):
+    def __init__(self, fract=False, c=1, w=5, a=1, rad=1, x=0, y=0, z=0, rx=0, ry=0, rz=0):
+        self.w = w
+        self.a = a
+        super().__init__(fract, c, rad, x, y, z, rx, ry, rz)
+
+    def sdf(self, pos):
+        return super(SphereWobble, self).sdf(pos) + (math.sin(pos[0]*self.w) * math.sin(pos[1]*self.w) * math.sin(pos[2]*self.w) * self.a)
 
 class Box(Object):
     def __init__(self, w=1, h=1, d=1, x=0, y=0, z=0, rx=0, ry=0, rz=0):
